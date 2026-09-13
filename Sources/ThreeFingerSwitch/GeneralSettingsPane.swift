@@ -52,7 +52,7 @@ struct GeneralSettingsPane: View {
         leftLabel: settings.reversesDirection ? "Next app" : "Previous app",
         rightLabel: settings.reversesDirection ? "Previous app" : "Next app"
       )
-      Text("The app order stays fixed, so reversing direction returns to the app you just left.")
+      Text("Clicking an app or using Command-Tab makes it the newest item in your app history.")
         .font(.caption)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)

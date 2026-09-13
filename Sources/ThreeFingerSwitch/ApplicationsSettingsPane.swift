@@ -6,7 +6,7 @@ struct ApplicationsSettingsPane: View {
   var body: some View {
     SettingsPage(
       title: "Applications",
-      subtitle: "Choose which open apps appear and arrange their carousel order."
+      subtitle: "Choose which open apps participate in switching."
     ) {
       listHeader
       applicationList
@@ -70,7 +70,6 @@ struct ApplicationsSettingsPane: View {
         .frame(width: 28, height: 28)
       applicationName(application)
       Spacer()
-      reorderControls(for: application)
     }
     .padding(.vertical, 3)
   }
@@ -94,29 +93,6 @@ struct ApplicationsSettingsPane: View {
         .font(.caption)
         .foregroundStyle(.secondary)
     }
-  }
-
-  private func reorderControls(for application: ApplicationChoice) -> some View {
-    ControlGroup {
-      reorderButton(for: application, offset: -1, symbol: "chevron.up", label: "earlier")
-      reorderButton(for: application, offset: 1, symbol: "chevron.down", label: "later")
-    }
-    .controlSize(.small)
-  }
-
-  private func reorderButton(
-    for application: ApplicationChoice,
-    offset: Int,
-    symbol: String,
-    label: String
-  ) -> some View {
-    Button {
-      applications.move(application.id, offset: offset)
-    } label: {
-      Image(systemName: symbol)
-    }
-    .disabled(!applications.canMove(application.id, offset: offset))
-    .accessibilityLabel("Move \(application.name) \(label)")
   }
 
   private var includedApplicationCount: Int {

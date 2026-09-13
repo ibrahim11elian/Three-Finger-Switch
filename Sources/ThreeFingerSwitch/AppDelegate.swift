@@ -75,12 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     .store(in: &subscriptions)
 
-    Publishers.CombineLatest(settings.$excludedBundleIdentifiers, settings.$preferredBundleOrder)
-      .sink { [weak applicationSwitcher] exclusions, order in
-        applicationSwitcher?.updatePreferences(
-          excludedBundleIdentifiers: exclusions,
-          preferredOrder: order
-        )
+    settings.$excludedBundleIdentifiers
+      .sink { [weak applicationSwitcher] exclusions in
+        applicationSwitcher?.updateExclusions(exclusions)
       }
       .store(in: &subscriptions)
   }

@@ -2,21 +2,21 @@
 
 <img src="AppResources/AppIcon.png" width="128" alt="Three Finger Switch icon">
 
-A focused macOS menu-bar utility that makes three-finger horizontal swipes behave like a stable app
-carousel:
+A focused macOS menu-bar utility that makes three-finger horizontal swipes behave like app history:
 
 - swipe left → previous app;
 - swipe right → next app;
-- reverse direction → return to the app you just left.
+- click or Command-Tab to an app → make it the newest item in history;
+- reverse direction → return through that history without creating a two-app loop.
 
 It switches immediately, without showing the Command-Tab interface or waiting for another click.
 
 ## Features
 
 - Exact three-finger detection on built-in and supported external trackpads
-- Stable, bidirectional order across all open regular applications
+- Bidirectional recent-app history across all open regular applications
 - Adjustable sensitivity and reversible directions
-- Per-app exclusions and custom app ordering
+- Per-app exclusions
 - Optional destination app indicator
 - Drag protection, rapid-swipe handling, and sleep/wake recovery
 - Launch at Login

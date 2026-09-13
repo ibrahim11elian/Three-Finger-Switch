@@ -4,77 +4,124 @@ import ThreeFingerSwitchCore
 
 final class ApplicationSwitcher {
   private var applications: [NSRunningApplication]
-  private var cursor = CarouselCursor()
+  private var history: ApplicationHistory
+  private var activationTracker = SwitcherActivationTracker()
   private var excludedBundleIdentifiers = Set<String>()
-  private var preferredBundleOrder = [String]()
+  private var activationObserver: NSObjectProtocol?
 
   init() {
-    applications = Self.initialApplicationOrder()
+    let initialApplications = Self.initialApplicationHistory()
+    applications = initialApplications
+    history = ApplicationHistory(
+      processIdentifiers: initialApplications.map(\.processIdentifier)
+    )
+    activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.didActivateApplicationNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] notification in
+      self?.recordActivation(from: notification)
+    }
+  }
+
+  deinit {
+    if let activationObserver {
+      NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
+    }
   }
 
   @discardableResult
   func switchApplication(_ direction: SwipeDirection) -> NSRunningApplication? {
     refreshApplications()
-    let processIdentifiers = applications.map(\.processIdentifier)
     let timestamp = ProcessInfo.processInfo.systemUptime
-    let sourceIndex = cursor.sourceIndex(
-      actualProcessIdentifier: NSWorkspace.shared.frontmostApplication?.processIdentifier,
-      processIdentifiers: processIdentifiers,
-      timestamp: timestamp
-    )
-    guard let destinationIndex = destinationIndex(from: sourceIndex, direction: direction) else {
-      return nil
-    }
-
-    let destination = applications[destinationIndex]
-    guard destination.activate(options: [.activateAllWindows]) else { return nil }
-    cursor.recordDestination(processIdentifier: destination.processIdentifier, timestamp: timestamp)
+    guard let destination = destination(for: direction, timestamp: timestamp) else { return nil }
+    guard activate(destination, timestamp: timestamp) else { return nil }
     return destination
   }
 
-  func updatePreferences(excludedBundleIdentifiers: Set<String>, preferredOrder: [String]) {
+  private func destination(
+    for direction: SwipeDirection,
+    timestamp: TimeInterval
+  ) -> NSRunningApplication? {
+    let destinationProcessIdentifier = history.destination(
+      actualProcessIdentifier: NSWorkspace.shared.frontmostApplication?.processIdentifier,
+      direction: direction,
+      timestamp: timestamp
+    )
+    return applications.first { $0.processIdentifier == destinationProcessIdentifier }
+  }
+
+  private func activate(
+    _ destination: NSRunningApplication,
+    timestamp: TimeInterval
+  ) -> Bool {
+    activationTracker.record(
+      processIdentifier: destination.processIdentifier,
+      timestamp: timestamp
+    )
+    guard destination.activate(options: [.activateAllWindows]) else {
+      activationTracker.cancel(processIdentifier: destination.processIdentifier)
+      return false
+    }
+    history.recordNavigation(
+      processIdentifier: destination.processIdentifier,
+      timestamp: timestamp
+    )
+    return true
+  }
+
+  func updateExclusions(_ excludedBundleIdentifiers: Set<String>) {
     self.excludedBundleIdentifiers = excludedBundleIdentifiers
-    preferredBundleOrder = preferredOrder
-    applications = Self.initialApplicationOrder()
-    cursor.reset()
     refreshApplications()
   }
 
-  private func destinationIndex(from sourceIndex: Int?, direction: SwipeDirection) -> Int? {
-    guard !applications.isEmpty else { return nil }
-    guard let sourceIndex else {
-      return direction == .right
-        ? applications.startIndex : applications.index(before: applications.endIndex)
+  private func recordActivation(from notification: Notification) {
+    guard
+      let application = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+        as? NSRunningApplication,
+      isEligible(application)
+    else { return }
+
+    addIfNeeded(application)
+    let timestamp = ProcessInfo.processInfo.systemUptime
+    activationTracker.discardExpired(before: timestamp)
+    recordObservedActivation(application, timestamp: timestamp)
+    activationTracker.cancel(processIdentifier: application.processIdentifier)
+  }
+
+  private func addIfNeeded(_ application: NSRunningApplication) {
+    let isKnown = applications.contains {
+      $0.processIdentifier == application.processIdentifier
     }
-    return CarouselIndex.destination(
-      from: sourceIndex,
-      count: applications.count,
-      direction: direction
-    )
+    if !isKnown {
+      applications.append(application)
+    }
+  }
+
+  private func recordObservedActivation(
+    _ application: NSRunningApplication,
+    timestamp: TimeInterval
+  ) {
+    if activationTracker.isPending(processIdentifier: application.processIdentifier) {
+      history.recordNavigation(
+        processIdentifier: application.processIdentifier,
+        timestamp: timestamp
+      )
+    } else {
+      history.recordExternalActivation(processIdentifier: application.processIdentifier)
+    }
   }
 
   private func refreshApplications() {
     applications.removeAll(where: { !isEligible($0) })
-    let knownPIDs = Set(applications.map(\.processIdentifier))
-    let newlyOpened = Self.initialApplicationOrder().filter {
-      isEligible($0) && !knownPIDs.contains($0.processIdentifier)
+    let knownProcessIdentifiers = Set(applications.map(\.processIdentifier))
+    let newlyDiscovered = NSWorkspace.shared.runningApplications.filter {
+      isEligible($0) && !knownProcessIdentifiers.contains($0.processIdentifier)
     }
-    applications.append(contentsOf: newlyOpened)
-    applyPreferredOrder()
-  }
-
-  private func applyPreferredOrder() {
-    guard !preferredBundleOrder.isEmpty else { return }
-    let preferred = preferredBundleOrder.flatMap { bundleIdentifier in
-      applications.filter { $0.bundleIdentifier == bundleIdentifier }
-    }
-    let preferredSet = Set(preferredBundleOrder)
-    applications =
-      preferred
-      + applications.filter {
-        guard let bundleIdentifier = $0.bundleIdentifier else { return true }
-        return !preferredSet.contains(bundleIdentifier)
-      }
+    applications.insert(contentsOf: newlyDiscovered, at: 0)
+    history.synchronize(
+      availableProcessIdentifiers: applications.map(\.processIdentifier)
+    )
   }
 
   private func isEligible(_ application: NSRunningApplication) -> Bool {
@@ -83,21 +130,36 @@ final class ApplicationSwitcher {
     return !excludedBundleIdentifiers.contains(bundleIdentifier)
   }
 
-  private static func initialApplicationOrder() -> [NSRunningApplication] {
+  private static func initialApplicationHistory() -> [NSRunningApplication] {
     let running = NSWorkspace.shared.runningApplications
-    let byPID = Dictionary(uniqueKeysWithValues: running.map { ($0.processIdentifier, $0) })
-    let windowOrdered = windowOwnerPIDs().compactMap { byPID[$0] }
-    let candidates =
-      [NSWorkspace.shared.frontmostApplication].compactMap { $0 }
-      + windowOrdered + running
-
-    var seenPIDs = Set<pid_t>()
-    return candidates.filter {
-      $0.activationPolicy == .regular && seenPIDs.insert($0.processIdentifier).inserted
+    let byProcessIdentifier = Dictionary(
+      uniqueKeysWithValues: running.map { ($0.processIdentifier, $0) }
+    )
+    let frontToBack = uniqueApplications(
+      windowOwnerProcessIdentifiers().compactMap { byProcessIdentifier[$0] }
+    )
+    let visibleProcessIdentifiers = Set(frontToBack.map(\.processIdentifier))
+    let background = running.filter {
+      $0.activationPolicy == .regular
+        && !visibleProcessIdentifiers.contains($0.processIdentifier)
     }
+    var oldestToNewest = background + frontToBack.reversed()
+
+    if let frontmost = NSWorkspace.shared.frontmostApplication {
+      oldestToNewest.removeAll { $0.processIdentifier == frontmost.processIdentifier }
+      oldestToNewest.append(frontmost)
+    }
+    return uniqueApplications(oldestToNewest)
   }
 
-  private static func windowOwnerPIDs() -> [pid_t] {
+  private static func uniqueApplications(
+    _ applications: some Sequence<NSRunningApplication>
+  ) -> [NSRunningApplication] {
+    var seen = Set<pid_t>()
+    return applications.filter { seen.insert($0.processIdentifier).inserted }
+  }
+
+  private static func windowOwnerProcessIdentifiers() -> [pid_t] {
     guard
       let windows = CGWindowListCopyWindowInfo(
         [.optionOnScreenOnly, .excludeDesktopElements],
@@ -109,9 +171,9 @@ final class ApplicationSwitcher {
       guard
         let layer = window[kCGWindowLayer] as? NSNumber,
         layer.intValue == 0,
-        let ownerPID = window[kCGWindowOwnerPID] as? NSNumber
+        let ownerProcessIdentifier = window[kCGWindowOwnerPID] as? NSNumber
       else { return nil }
-      return ownerPID.int32Value
+      return ownerProcessIdentifier.int32Value
     }
   }
 }

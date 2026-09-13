@@ -116,33 +116,92 @@ require(
 print("Carousel checks passed")
 
 do {
-  var cursor = CarouselCursor()
-  let processIdentifiers: [Int32] = [10, 20, 30]
+  var history = ApplicationHistory(processIdentifiers: [10, 20, 30])
   require(
-    cursor.sourceIndex(
+    history.destination(
       actualProcessIdentifier: 10,
-      processIdentifiers: processIdentifiers,
+      direction: .right,
       timestamp: 1.0
-    ) == 0,
-    "the carousel should start from the frontmost app"
-  )
-  cursor.recordDestination(processIdentifier: 20, timestamp: 1.0)
-  require(
-    cursor.sourceIndex(
-      actualProcessIdentifier: 10,
-      processIdentifiers: processIdentifiers,
-      timestamp: 1.1
-    ) == 1,
-    "a rapid swipe should continue from the virtual destination"
+    ) == 20,
+    "right should move toward newer history"
   )
   require(
-    cursor.sourceIndex(
+    history.destination(
       actualProcessIdentifier: 30,
-      processIdentifiers: processIdentifiers,
-      timestamp: 3.0
-    ) == 2,
-    "the cursor should reconcile with the frontmost app after a pause"
+      direction: .left,
+      timestamp: 1.0
+    ) == 20,
+    "left should return to the previously active app"
+  )
+
+  history.recordNavigation(processIdentifier: 20, timestamp: 1.0)
+  require(
+    history.destination(
+      actualProcessIdentifier: 30,
+      direction: .left,
+      timestamp: 1.1
+    ) == 10,
+    "rapid left swipes should continue through older apps"
+  )
+
+  history.recordNavigation(processIdentifier: 10, timestamp: 1.1)
+  require(
+    history.destination(
+      actualProcessIdentifier: 30,
+      direction: .right,
+      timestamp: 1.2
+    ) == 20,
+    "reversing direction should walk forward through the same history"
+  )
+
+  history.recordExternalActivation(processIdentifier: 10)
+  require(
+    history.processIdentifiers == [20, 30, 10],
+    "a click or Command-Tab activation should become newest"
+  )
+  require(
+    history.destination(
+      actualProcessIdentifier: 10,
+      direction: .left,
+      timestamp: 1.3
+    ) == 30,
+    "left should return from an external activation to its predecessor"
+  )
+
+  history.synchronize(availableProcessIdentifiers: [10, 30, 40])
+  require(
+    history.processIdentifiers == [40, 30, 10],
+    "closed apps should be removed and unknown apps should start as oldest"
   )
 }
 
-print("Carousel cursor checks passed")
+print("Application history checks passed")
+
+do {
+  var tracker = SwitcherActivationTracker(notificationInterval: 2)
+  tracker.record(processIdentifier: 20, timestamp: 1)
+  tracker.record(processIdentifier: 30, timestamp: 1.1)
+  tracker.discardExpired(before: 1.2)
+  require(
+    tracker.isPending(processIdentifier: 20),
+    "rapid utility activations should each be recognized"
+  )
+  tracker.cancel(processIdentifier: 20)
+  require(
+    tracker.isPending(processIdentifier: 30),
+    "the latest utility activation should be recognized"
+  )
+  tracker.cancel(processIdentifier: 30)
+  require(
+    !tracker.isPending(processIdentifier: 20),
+    "an activation should be consumed only once"
+  )
+  tracker.record(processIdentifier: 40, timestamp: 2)
+  tracker.discardExpired(before: 4.1)
+  require(
+    !tracker.isPending(processIdentifier: 40),
+    "expired utility activations should be treated as external"
+  )
+}
+
+print("Activation tracker checks passed")

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.2.0
+
+- Track app activations from clicks and Command-Tab so the previous app is always the one used most
+  recently.
+- Keep utility-triggered activations out of recent-app ordering to preserve multi-app navigation.
+- Simplify application preferences to exclusions; recent order is now automatic.
+
 ## 2.1.0
 
 - Redesign Settings with a native sidebar, clearer alignment, and compact sections.

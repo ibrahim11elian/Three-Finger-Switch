@@ -7,7 +7,6 @@ final class SettingsStore: ObservableObject {
   @Published var reversesDirection: Bool { didSet { save() } }
   @Published var showsHUD: Bool { didSet { save() } }
   @Published var excludedBundleIdentifiers: Set<String> { didSet { save() } }
-  @Published var preferredBundleOrder: [String] { didSet { save() } }
 
   private enum Key {
     static let isEnabled = "isEnabled"
@@ -15,7 +14,6 @@ final class SettingsStore: ObservableObject {
     static let reversesDirection = "reversesDirection"
     static let showsHUD = "showsHUD"
     static let excludedBundleIdentifiers = "excludedBundleIdentifiers"
-    static let preferredBundleOrder = "preferredBundleOrder"
   }
 
   private let defaults: UserDefaults
@@ -30,8 +28,6 @@ final class SettingsStore: ObservableObject {
     excludedBundleIdentifiers = Set(
       Self.validBundleIdentifiers(
         defaults.stringArray(forKey: Key.excludedBundleIdentifiers) ?? []))
-    preferredBundleOrder = Self.validBundleIdentifiers(
-      defaults.stringArray(forKey: Key.preferredBundleOrder) ?? [])
   }
 
   static func horizontalThreshold(for sensitivity: Double) -> Float {
@@ -44,7 +40,6 @@ final class SettingsStore: ObservableObject {
     reversesDirection = false
     showsHUD = true
     excludedBundleIdentifiers = []
-    preferredBundleOrder = []
   }
 
   private func save() {
@@ -53,7 +48,6 @@ final class SettingsStore: ObservableObject {
     defaults.set(reversesDirection, forKey: Key.reversesDirection)
     defaults.set(showsHUD, forKey: Key.showsHUD)
     defaults.set(Array(excludedBundleIdentifiers).sorted(), forKey: Key.excludedBundleIdentifiers)
-    defaults.set(preferredBundleOrder, forKey: Key.preferredBundleOrder)
   }
 
   private static func normalizedSensitivity(_ sensitivity: Double) -> Double {
