@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.3
+
+- Replace the low-contrast glass switch card with a focused, icon-only indicator.
+
 ## 2.2.2
 
 - Keep an active swipe alive through a momentary two- or four-contact trackpad frame.

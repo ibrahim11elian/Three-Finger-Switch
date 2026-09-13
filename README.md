@@ -120,8 +120,9 @@ NOTARY_PROFILE="three-finger-switch" \
 Create a release by pushing a tag that matches the app version:
 
 ```sh
-git tag v2.2.2
-git push origin v2.2.2
+version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' AppResources/Info.plist)
+git tag "v$version"
+git push origin "v$version"
 ```
 
 ## Privacy

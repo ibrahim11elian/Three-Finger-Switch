@@ -27,7 +27,7 @@ struct GeneralSettingsPane: View {
       )
       SettingsToggleRow(
         title: "Switch indicator",
-        detail: "Show the destination app’s icon and name after each switch.",
+        detail: "Show the destination app’s icon after each switch.",
         isOn: $settings.showsHUD
       )
     }
