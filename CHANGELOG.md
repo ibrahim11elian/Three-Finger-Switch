@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.2
+
+- Keep an active swipe alive through a momentary two- or four-contact trackpad frame.
+- Make slow and slightly diagonal horizontal swipes more reliable without accepting two- or
+  four-finger gestures.
+
 ## 2.2.1
 
 - Record both sides of a Dock or direct-click transition, including when the source app was reached

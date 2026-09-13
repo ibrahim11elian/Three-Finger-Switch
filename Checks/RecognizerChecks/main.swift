@@ -74,10 +74,13 @@ do {
     "three-finger gesture should begin")
   require(
     recognizer.recognize(touchCount: 4, centroid: [0.25, 0.50], timestamp: 4.1) == nil,
-    "four fingers should cancel")
+    "a brief fourth contact should be ignored")
   require(
-    recognizer.recognize(touchCount: 3, centroid: [0.36, 0.50], timestamp: 4.2) == nil,
-    "gesture should restart after cancellation")
+    recognizer.recognize(touchCount: 3, centroid: [0.36, 0.50], timestamp: 4.21) == nil,
+    "a contact mismatch beyond the grace period should restart the gesture")
+  require(
+    recognizer.recognize(touchCount: 3, centroid: [0.49, 0.50], timestamp: 4.3) == .right,
+    "the restarted gesture should still trigger normally")
 }
 
 do {
@@ -86,8 +89,88 @@ do {
     recognizer.recognize(touchCount: 3, centroid: [0.20, 0.50], timestamp: 5.0) == nil,
     "slow gesture should begin")
   require(
-    recognizer.recognize(touchCount: 3, centroid: [0.34, 0.50], timestamp: 6.0) == nil,
+    recognizer.recognize(touchCount: 3, centroid: [0.34, 0.50], timestamp: 6.1) == nil,
     "slow gesture should restart instead of trigger")
+}
+
+do {
+  let recognizer = SwipeRecognizer()
+  require(
+    recognizer.recognize(touchCount: 3, centroid: [0.20, 0.50], timestamp: 7.0) == nil,
+    "a noisy three-finger gesture should begin"
+  )
+  require(
+    recognizer.recognize(touchCount: 3, centroid: [0.26, 0.50], timestamp: 7.03) == nil,
+    "movement before a noisy frame should be retained"
+  )
+  require(
+    recognizer.recognize(touchCount: 4, centroid: [0.30, 0.50], timestamp: 7.05) == nil,
+    "a brief fourth contact should not trigger"
+  )
+  require(
+    recognizer.recognize(touchCount: 3, centroid: [0.34, 0.51], timestamp: 7.10) == nil,
+    "the first valid frame after noise should reconnect without adding movement"
+  )
+  require(
+    recognizer.recognize(touchCount: 3, centroid: [0.41, 0.51], timestamp: 7.15) == .right,
+    "movement around a brief contact-count glitch should remain usable"
+  )
+}
+
+do {
+  let recognizer = SwipeRecognizer()
+  require(
+    recognizer.recognize(touchCount: 3, centroid: [0.20, 0.50], timestamp: 8.0) == nil,
+    "a gesture with sustained contact noise should begin"
+  )
+  require(
+    recognizer.recognize(touchCount: 2, centroid: [0.25, 0.50], timestamp: 8.05) == nil,
+    "a second contact should enter the grace period"
+  )
+  require(
+    recognizer.recognize(touchCount: 2, centroid: [0.30, 0.50], timestamp: 8.16) == nil,
+    "a sustained two-finger mismatch should cancel"
+  )
+  require(
+    recognizer.recognize(touchCount: 3, centroid: [0.36, 0.50], timestamp: 8.17) == nil,
+    "three fingers should begin a new gesture after cancellation"
+  )
+}
+
+do {
+  let recognizer = SwipeRecognizer()
+  require(
+    recognizer.recognize(touchCount: 2, centroid: [0.20, 0.50], timestamp: 9.0) == nil,
+    "two fingers should not begin a gesture"
+  )
+  require(
+    recognizer.recognize(touchCount: 3, centroid: [0.36, 0.50], timestamp: 9.1) == nil,
+    "three fingers should not inherit two-finger movement"
+  )
+}
+
+do {
+  let recognizer = SwipeRecognizer()
+  require(
+    recognizer.recognize(touchCount: 4, centroid: [0.20, 0.50], timestamp: 10.0) == nil,
+    "four fingers should not begin a gesture"
+  )
+  require(
+    recognizer.recognize(touchCount: 4, centroid: [0.40, 0.50], timestamp: 10.2) == nil,
+    "four fingers should never trigger"
+  )
+}
+
+do {
+  let recognizer = SwipeRecognizer()
+  require(
+    recognizer.recognize(touchCount: 3, centroid: [0.20, 0.40], timestamp: 11.0) == nil,
+    "a slightly diagonal swipe should begin"
+  )
+  require(
+    recognizer.recognize(touchCount: 3, centroid: [0.34, 0.49], timestamp: 11.2) == .right,
+    "a clearly horizontal diagonal swipe should trigger"
+  )
 }
 
 print("Recognizer checks passed")
