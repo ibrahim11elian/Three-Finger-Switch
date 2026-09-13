@@ -154,10 +154,13 @@ do {
     "reversing direction should walk forward through the same history"
   )
 
-  history.recordExternalActivation(processIdentifier: 10)
+  history.recordExternalTransition(
+    previousProcessIdentifier: 30,
+    activatedProcessIdentifier: 10
+  )
   require(
     history.processIdentifiers == [20, 30, 10],
-    "a click or Command-Tab activation should become newest"
+    "an external transition should preserve the app that was just left"
   )
   require(
     history.destination(
@@ -176,6 +179,38 @@ do {
 }
 
 print("Application history checks passed")
+
+do {
+  var history = ApplicationHistory(processIdentifiers: [10, 20])
+  history.recordNavigation(processIdentifier: 10, timestamp: 1)
+  history.recordExternalTransition(
+    previousProcessIdentifier: 10,
+    activatedProcessIdentifier: 30
+  )
+  require(
+    history.processIdentifiers == [20, 10, 30],
+    "clicking from a history destination should promote the app that was just left"
+  )
+  require(
+    history.destination(
+      actualProcessIdentifier: 30,
+      direction: .left,
+      timestamp: 1.1
+    ) == 10,
+    "the first left swipe after a Dock click should return to the app just left"
+  )
+  history.recordNavigation(processIdentifier: 10, timestamp: 1.1)
+  require(
+    history.destination(
+      actualProcessIdentifier: 30,
+      direction: .left,
+      timestamp: 1.2
+    ) == 20,
+    "the second left swipe should continue to the next older app"
+  )
+}
+
+print("External transition checks passed")
 
 do {
   var tracker = SwitcherActivationTracker(notificationInterval: 2)

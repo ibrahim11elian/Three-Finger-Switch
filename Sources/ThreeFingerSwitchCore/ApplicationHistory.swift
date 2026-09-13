@@ -29,10 +29,17 @@ public struct ApplicationHistory {
     }
   }
 
-  public mutating func recordExternalActivation(processIdentifier: Int32) {
-    processIdentifiers.removeAll { $0 == processIdentifier }
-    processIdentifiers.append(processIdentifier)
-    virtualProcessIdentifier = processIdentifier
+  public mutating func recordExternalTransition(
+    previousProcessIdentifier: Int32?,
+    activatedProcessIdentifier: Int32
+  ) {
+    if let previousProcessIdentifier,
+      previousProcessIdentifier != activatedProcessIdentifier
+    {
+      moveToNewest(previousProcessIdentifier)
+    }
+    moveToNewest(activatedProcessIdentifier)
+    virtualProcessIdentifier = activatedProcessIdentifier
     continuationDeadline = 0
   }
 
@@ -85,5 +92,10 @@ public struct ApplicationHistory {
   private static func unique(_ processIdentifiers: [Int32]) -> [Int32] {
     var seen = Set<Int32>()
     return processIdentifiers.filter { seen.insert($0).inserted }
+  }
+
+  private mutating func moveToNewest(_ processIdentifier: Int32) {
+    processIdentifiers.removeAll { $0 == processIdentifier }
+    processIdentifiers.append(processIdentifier)
   }
 }

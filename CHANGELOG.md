@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.1
+
+- Record both sides of a Dock or direct-click transition, including when the source app was reached
+  through a swipe.
+
 ## 2.2.0
 
 - Track app activations from clicks and Command-Tab so the previous app is always the one used most

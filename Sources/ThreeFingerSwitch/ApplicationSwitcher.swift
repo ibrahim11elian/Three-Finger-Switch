@@ -8,6 +8,7 @@ final class ApplicationSwitcher {
   private var activationTracker = SwitcherActivationTracker()
   private var excludedBundleIdentifiers = Set<String>()
   private var activationObserver: NSObjectProtocol?
+  private var currentProcessIdentifier: pid_t?
 
   init() {
     let initialApplications = Self.initialApplicationHistory()
@@ -15,6 +16,7 @@ final class ApplicationSwitcher {
     history = ApplicationHistory(
       processIdentifiers: initialApplications.map(\.processIdentifier)
     )
+    currentProcessIdentifier = NSWorkspace.shared.frontmostApplication?.processIdentifier
     activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
       forName: NSWorkspace.didActivateApplicationNotification,
       object: nil,
@@ -67,6 +69,7 @@ final class ApplicationSwitcher {
       processIdentifier: destination.processIdentifier,
       timestamp: timestamp
     )
+    currentProcessIdentifier = destination.processIdentifier
     return true
   }
 
@@ -85,7 +88,12 @@ final class ApplicationSwitcher {
     addIfNeeded(application)
     let timestamp = ProcessInfo.processInfo.systemUptime
     activationTracker.discardExpired(before: timestamp)
-    recordObservedActivation(application, timestamp: timestamp)
+    recordObservedActivation(
+      application,
+      previousProcessIdentifier: currentProcessIdentifier,
+      timestamp: timestamp
+    )
+    currentProcessIdentifier = application.processIdentifier
     activationTracker.cancel(processIdentifier: application.processIdentifier)
   }
 
@@ -100,6 +108,7 @@ final class ApplicationSwitcher {
 
   private func recordObservedActivation(
     _ application: NSRunningApplication,
+    previousProcessIdentifier: pid_t?,
     timestamp: TimeInterval
   ) {
     if activationTracker.isPending(processIdentifier: application.processIdentifier) {
@@ -108,7 +117,10 @@ final class ApplicationSwitcher {
         timestamp: timestamp
       )
     } else {
-      history.recordExternalActivation(processIdentifier: application.processIdentifier)
+      history.recordExternalTransition(
+        previousProcessIdentifier: previousProcessIdentifier,
+        activatedProcessIdentifier: application.processIdentifier
+      )
     }
   }
 
