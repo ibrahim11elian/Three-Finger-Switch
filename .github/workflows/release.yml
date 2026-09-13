@@ -13,7 +13,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check signing configuration
+        id: signing
+        env:
+          CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          CODESIGN_IDENTITY: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}
+          KEYCHAIN_PASSWORD: ${{ secrets.APPLE_CI_KEYCHAIN_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          signing_values=(
+            "$CERTIFICATE_P12_BASE64"
+            "$CERTIFICATE_PASSWORD"
+            "$CODESIGN_IDENTITY"
+            "$KEYCHAIN_PASSWORD"
+            "$APPLE_ID"
+            "$APPLE_TEAM_ID"
+            "$APPLE_APP_SPECIFIC_PASSWORD"
+          )
+          for signing_value in "${signing_values[@]}"; do
+            if [[ -z "$signing_value" ]]; then
+              echo "available=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
       - name: Import Developer ID certificate
+        if: steps.signing.outputs.available == 'true'
         env:
           CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
@@ -29,7 +58,8 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
           security list-keychains -d user -s "$keychain_path"
 
-      - name: Build, sign, notarize, and staple
+      - name: Build notarized release
+        if: steps.signing.outputs.available == 'true'
         env:
           APP_VERSION: ${{ github.ref_name }}
           BUILD_NUMBER: ${{ github.run_number }}
@@ -45,6 +75,18 @@ jobs:
           fi
           export APP_VERSION="${APP_VERSION#v}"
           ./scripts/package-release.sh
+
+      - name: Build ad-hoc release
+        if: steps.signing.outputs.available != 'true'
+        env:
+          APP_VERSION: ${{ github.ref_name }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          export APP_VERSION="${APP_VERSION#v}"
+          ARCHS="arm64 x86_64" ./scripts/build-app.sh
+          archive="outputs/Three-Finger-Switch-$APP_VERSION.zip"
+          ditto -c -k --keepParent "outputs/Three Finger Switch.app" "$archive"
+          (cd outputs && shasum -a 256 "$(basename "$archive")") > "$archive.sha256"
 
       - name: Publish GitHub release
         env:

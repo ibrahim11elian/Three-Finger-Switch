@@ -22,10 +22,58 @@ It switches immediately, without showing the Command-Tab interface or waiting fo
 - Launch at Login
 - Native light and dark appearance
 
-## Install
+## Download and install
 
-Download the latest notarized ZIP from the repository’s **Releases** page, unzip it, and move
-**Three Finger Switch.app** to `/Applications`. Open it once; afterward it lives in the menu bar.
+### Option 1: Download the ready-built app
+
+1. Open the [latest release](https://github.com/ibrahim11elian/Three-Finger-Switch/releases/latest).
+2. Download `Three-Finger-Switch-<version>.zip` from **Assets**. Do not download GitHub's
+   automatically generated “Source code” archives unless you intend to build the app yourself.
+3. Double-click the downloaded ZIP to extract it.
+4. Drag **Three Finger Switch.app** into the **Applications** folder.
+5. Open it from **Applications**. The app then lives in the menu bar.
+
+Until Developer ID credentials are configured, GitHub builds are ad-hoc signed. On the first
+launch, macOS may say that it cannot verify the developer. If that happens:
+
+1. Click **Done** in the warning.
+2. Open **System Settings → Privacy & Security**.
+3. Scroll to **Security**, click **Open Anyway** beside Three Finger Switch, then confirm **Open**.
+
+This approval is required only once for that build. A future Developer ID-notarized release will
+open normally without these additional steps.
+
+### Option 2: Build from source
+
+1. Install Apple's Command Line Tools if needed:
+
+   ```sh
+   xcode-select --install
+   ```
+
+2. Download the source using either method:
+
+   - On GitHub, select **Code → Download ZIP**, extract it, then open the extracted folder in
+     Terminal.
+   - Or clone it from Terminal:
+
+     ```sh
+     git clone https://github.com/ibrahim11elian/Three-Finger-Switch.git
+     cd Three-Finger-Switch
+     ```
+
+3. Build the app:
+
+   ```sh
+   ./scripts/render-app-icon.sh
+   ARCHS="arm64 x86_64" ./scripts/build-app.sh
+   ```
+
+4. Drag `outputs/Three Finger Switch.app` into **Applications**, then open it.
+
+The build is ad-hoc signed and is intended for local use.
+
+## Trackpad setup
 
 In **System Settings → Trackpad → More Gestures**, set **Swipe between full-screen applications** to
 four fingers or turn it off. This prevents macOS from also changing Spaces when you use this app’s
@@ -33,30 +81,16 @@ three-finger gesture.
 
 The app does not need Accessibility, Screen Recording, or network access.
 
-## Build from source
-
-macOS Command Line Tools are enough for a local build:
-
-```sh
-./scripts/render-app-icon.sh
-./scripts/build-app.sh
-```
-
-The app is created at `outputs/Three Finger Switch.app`. A local build is ad-hoc signed and is meant
-for use on the Mac that built it.
-
-To build a universal binary for Apple silicon and Intel Macs:
-
-```sh
-ARCHS="arm64 x86_64" ./scripts/build-app.sh
-```
-
 ## Public releases
 
-GitHub Actions runs checks for each pull request. Pushing a tag such as `v2.1.0` creates a universal,
-Developer ID-signed, notarized, and stapled GitHub Release.
+GitHub Actions runs checks for each pull request. Pushing a version tag creates a universal GitHub
+Release containing the app ZIP and its SHA-256 checksum. Without release credentials, the workflow
+creates an ad-hoc-signed build and users follow the one-time **Open Anyway** instructions above.
 
-Before the first public tag:
+When Developer ID credentials are configured, the same workflow signs, notarizes, and staples the
+app so it opens without that warning.
+
+To enable notarized releases:
 
 1. Join the Apple Developer Program and create a **Developer ID Application** certificate.
 2. Export that certificate and private key as a password-protected `.p12` file.
@@ -83,8 +117,12 @@ NOTARY_PROFILE="three-finger-switch" \
 ./scripts/package-release.sh
 ```
 
-Never publish the ad-hoc-signed local build as a release. Gatekeeper treats a downloaded unsigned or
-ad-hoc-signed app differently from a Developer ID-signed and notarized app.
+Create a release by pushing a tag that matches the app version:
+
+```sh
+git tag v2.2.2
+git push origin v2.2.2
+```
 
 ## Privacy
 
